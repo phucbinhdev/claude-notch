@@ -57,7 +57,7 @@ final class NotchiStateMachine {
             }
 
         case "PreToolUse":
-            if isDone {
+            if event.tool == "AskUserQuestion" || isDone {
                 SoundService.shared.playNotificationSound(sessionId: event.sessionId, isInteractive: session.isInteractive)
             }
 
@@ -70,7 +70,7 @@ final class NotchiStateMachine {
         case "SessionStart":
             handleClaudeUsageResumeTrigger(.sessionStart)
 
-        case "Stop":
+        case "Stop", "SubagentStop":
             SoundService.shared.playNotificationSound(sessionId: event.sessionId, isInteractive: session.isInteractive)
             stopFileWatcher(sessionId: event.sessionId)
             scheduleFileSync(sessionId: event.sessionId, cwd: event.cwd)

@@ -6,7 +6,6 @@ struct PanelSettingsView: View {
     @State private var hooksInstalled = HookInstaller.isInstalled()
     @State private var hooksError = false
     @State private var apiKeyInput = AppSettings.anthropicApiKey ?? ""
-    @ObservedObject private var updateManager = UpdateManager.shared
     private var usageConnected: Bool { ClaudeUsageService.shared.isConnected }
     private var hasApiKey: Bool { !apiKeyInput.isEmpty }
 
@@ -27,8 +26,6 @@ struct PanelSettingsView: View {
                     displaySection
                     Divider().background(Color.white.opacity(0.08))
                     togglesSection
-                    Divider().background(Color.white.opacity(0.08))
-                    actionsSection
                 }
                 .padding(.top, 10)
             }
@@ -126,34 +123,6 @@ struct PanelSettingsView: View {
         AppSettings.anthropicApiKey = trimmed.isEmpty ? nil : trimmed
     }
 
-    private var actionsSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Button(action: handleUpdatesAction) {
-                SettingsRowView(icon: "arrow.triangle.2.circlepath", title: "Check for Updates") {
-                    updateStatusView
-                }
-            }
-            .buttonStyle(.plain)
-
-            Button(action: openGitHubRepo) {
-                SettingsRowView(icon: "star", title: "Star on GitHub") {
-                    Image(systemName: "arrow.up.right")
-                        .font(.system(size: 10))
-                        .foregroundColor(TerminalColors.dimmedText)
-                }
-            }
-            .buttonStyle(.plain)
-        }
-    }
-
-    private func openGitHubRepo() {
-        NSWorkspace.shared.open(URL(string: "https://github.com/sk-ruban/notchi")!)
-    }
-
-    private func openLatestReleasePage() {
-        NSWorkspace.shared.open(URL(string: "https://github.com/sk-ruban/notchi/releases/latest")!)
-    }
-
     private var quitSection: some View {
         Button(action: {
             NSApplication.shared.terminate(nil)
@@ -193,14 +162,6 @@ struct PanelSettingsView: View {
         ClaudeUsageService.shared.connectAndStartPolling()
     }
 
-    private func handleUpdatesAction() {
-        if case .upToDate = updateManager.state {
-            openLatestReleasePage()
-        } else {
-            updateManager.checkForUpdates()
-        }
-    }
-
     private func installHooksIfNeeded() {
         guard !hooksInstalled else { return }
         hooksError = false
@@ -225,39 +186,6 @@ struct PanelSettingsView: View {
             .frame(maxWidth: 160, alignment: .trailing)
     }
 
-    @ViewBuilder
-    private var updateStatusView: some View {
-        switch updateManager.state {
-        case .checking:
-            HStack(spacing: 4) {
-                ProgressView()
-                    .controlSize(.mini)
-                Text("Checking...")
-                    .font(.system(size: 10))
-                    .foregroundColor(TerminalColors.dimmedText)
-            }
-        case .upToDate:
-            statusBadge("Up to date", color: TerminalColors.green)
-        case .updateAvailable:
-            statusBadge("Update available", color: TerminalColors.amber)
-        case .downloading:
-            HStack(spacing: 4) {
-                ProgressView()
-                    .controlSize(.mini)
-                Text("Downloading...")
-                    .font(.system(size: 10))
-                    .foregroundColor(TerminalColors.dimmedText)
-            }
-        case .readyToInstall:
-            statusBadge("Ready to install", color: TerminalColors.green)
-        case .error(let failure):
-            statusBadge(failure.label, color: TerminalColors.red)
-        case .idle:
-            Text("v\(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0")")
-                .font(.system(size: 10))
-                .foregroundColor(TerminalColors.dimmedText)
-        }
-    }
 }
 
 struct SettingsRowView<Trailing: View>: View {
