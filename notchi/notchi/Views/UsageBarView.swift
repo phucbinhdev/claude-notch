@@ -11,6 +11,11 @@ struct UsageBarView: View {
     var isEnabled: Bool = AppSettings.isUsageEnabled
     var onConnect: (() -> Void)?
     var onRetry: (() -> Void)?
+    @State private var lastManualRetryAt: Date = .distantPast
+    @State private var isManualRefreshing = false
+    @State private var manualRefreshToken = 0
+
+    private let manualRetryCooldown: TimeInterval = 4
 
     var actionHint: String? {
         switch recoveryAction {
@@ -47,6 +52,10 @@ struct UsageBarView: View {
     }
 
     var shouldAllowTapAction: Bool {
+        if usage != nil, onRetry != nil, !isLoading, canTriggerManualRetry {
+            return true
+        }
+
         switch recoveryAction {
         case .reconnect, .waitForClaudeCode:
             return true
@@ -55,6 +64,10 @@ struct UsageBarView: View {
         case .none:
             return false
         }
+    }
+
+    private var canTriggerManualRetry: Bool {
+        Date().timeIntervalSince(lastManualRetryAt) >= manualRetryCooldown
     }
 
     var body: some View {
@@ -104,6 +117,11 @@ struct UsageBarView: View {
                                 .foregroundColor(TerminalColors.dimmedText)
                                 .lineLimit(1)
                                 .truncationMode(.tail)
+                        } else if isManualRefreshing {
+                            Text("• Refreshing…")
+                                .font(.system(size: 9))
+                                .foregroundColor(TerminalColors.dimmedText)
+                                .lineLimit(1)
                         }
                     }
                 } else if let statusMessage, usage != nil {
@@ -116,7 +134,7 @@ struct UsageBarView: View {
                         .foregroundColor(TerminalColors.secondaryText)
                 }
                 Spacer()
-                if isLoading {
+                if isLoading || isManualRefreshing {
                     ProgressView()
                         .controlSize(.mini)
                 } else if usage != nil {
@@ -131,6 +149,22 @@ struct UsageBarView: View {
         .contentShape(Rectangle())
         .onTapGesture {
             guard shouldAllowTapAction else { return }
+
+            if usage != nil {
+                lastManualRetryAt = Date()
+                manualRefreshToken += 1
+                let currentToken = manualRefreshToken
+                isManualRefreshing = true
+                onRetry?()
+                Task { @MainActor in
+                    try? await Task.sleep(for: .seconds(1.2))
+                    if manualRefreshToken == currentToken {
+                        isManualRefreshing = false
+                    }
+                }
+                return
+            }
+
             switch recoveryAction {
             case .retry:
                 onRetry?()

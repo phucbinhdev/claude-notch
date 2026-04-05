@@ -23,7 +23,6 @@ struct NotchContentView: View {
     @State private var showingSessionActivity = false
     @State private var isMuted = AppSettings.isMuted
     @State private var isActivityCollapsed = false
-    @State private var hoveredSessionId: String?
 
     private var sessionStore: SessionStore {
         stateMachine.sessionStore
@@ -40,6 +39,44 @@ struct NotchContentView: View {
 
     private var sideWidth: CGFloat {
         max(0, notchSize.height - 12) + 24
+    }
+
+    private var primaryTask: NotchiTask {
+        sessionStore.sortedSessions.first?.state.task ?? .idle
+    }
+
+    private var isNormalState: Bool {
+        primaryTask == .idle
+    }
+
+    private var collapsedNotchHeight: CGFloat {
+        max(0, notchSize.height - 4)
+    }
+
+    private let collapsedIconSlotWidth: CGFloat = 20
+
+    private var leftCompanionWidth: CGFloat {
+        guard !isExpanded else { return sideWidth }
+        return collapsedIconSlotWidth
+    }
+
+    private var rightStatusWidth: CGFloat {
+        guard !isExpanded else { return sideWidth }
+        return collapsedIconSlotWidth
+    }
+
+    private var shouldShowRightStatusIcon: Bool {
+        !isNormalState
+    }
+
+    private var leftCompanionOffsetX: CGFloat {
+        guard !isExpanded else { return -15 }
+        return -6
+    }
+
+    private var rightStatusOffsetX: CGFloat {
+        guard !isExpanded else { return 15 }
+        return 6
     }
 
     private var topCornerRadius: CGFloat {
@@ -61,11 +98,6 @@ struct NotchContentView: View {
         ))
     }
 
-    private var grassHeight: CGFloat {
-        let expandedPanelHeight = NotchConstants.expandedPanelSize.height - notchSize.height - 24
-        return expandedPanelHeight * 0.3 + notchSize.height
-    }
-
     private var shouldShowBackButton: Bool {
         showingPanelSettings ||
         (sessionStore.activeSessionCount >= 2 && showingSessionActivity)
@@ -84,44 +116,7 @@ struct NotchContentView: View {
         .padding(.horizontal, isExpanded ? cornerRadiusInsets.opened.top : cornerRadiusInsets.closed.bottom)
         .padding(.bottom, isExpanded ? 12 : 0)
         .background {
-            ZStack(alignment: .top) {
-                Color.black
-                GrassIslandView(sessions: sessionStore.sortedSessions, selectedSessionId: sessionStore.selectedSessionId, hoveredSessionId: hoveredSessionId)
-                    .frame(height: grassHeight, alignment: .bottom)
-                    .opacity(isExpanded && !showingPanelSettings ? 1 : 0)
-            }
-        }
-        .overlay(alignment: .top) {
-            if isExpanded && !showingPanelSettings {
-                GrassTapOverlay(
-                    sessions: sessionStore.sortedSessions,
-                    selectedSessionId: sessionStore.selectedSessionId,
-                    hoveredSessionId: $hoveredSessionId,
-                    onSelectSession: { sessionId in
-                        guard sessionStore.activeSessionCount >= 2 else { return }
-                        sessionStore.selectSession(sessionId)
-                        showingSessionActivity = true
-                    }
-                )
-                .frame(height: grassHeight, alignment: .bottom)
-            }
-        }
-        .overlay(alignment: .topTrailing) {
-            if isExpanded && !showingPanelSettings {
-                Button(action: {
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                        isActivityCollapsed.toggle()
-                    }
-                }) {
-                    Image(systemName: isActivityCollapsed ? "chevron.down" : "chevron.up")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(.white.opacity(0.7))
-                        .padding(8)
-                }
-                .buttonStyle(.plain)
-                .offset(y: grassHeight - 30)
-                .padding(.trailing, 30)
-            }
+            Color.black
         }
         .clipShape(notchClipShape)
         .shadow(
@@ -137,7 +132,6 @@ struct NotchContentView: View {
             if !expanded {
                 showingPanelSettings = false
                 showingSessionActivity = false
-                hoveredSessionId = nil
             }
         }
         .onChange(of: sessionStore.activeSessionCount) { _, count in
@@ -152,7 +146,7 @@ struct NotchContentView: View {
         ZStack(alignment: .topTrailing) {
             VStack(alignment: .leading, spacing: 0) {
                 headerRow
-                    .frame(height: notchSize.height)
+                    .frame(height: isExpanded ? notchSize.height : collapsedNotchHeight)
 
                 if isExpanded {
                     ExpandedPanelView(
@@ -185,11 +179,11 @@ struct NotchContentView: View {
                     } else {
                         HStack(spacing: 8) {
                             PanelHeaderButton(
-                                sfSymbol: panelManager.isPinned ? "pin.fill" : "pin",
+                                sfSymbol: panelManager.isPinned ? "pin.circle.fill" : "pin.circle",
                                 action: { panelManager.togglePin() }
                             )
                             PanelHeaderButton(
-                                sfSymbol: isMuted ? "bell.slash" : "bell",
+                                sfSymbol: isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill",
                                 action: toggleMute
                             )
                         }
@@ -208,11 +202,11 @@ struct NotchContentView: View {
     private var headerButtons: some View {
         HStack(spacing: 8) {
             PanelHeaderButton(
-                sfSymbol: "gearshape",
+                sfSymbol: "gearshape.fill",
                 showsIndicator: updateManager.hasPendingUpdate,
                 action: { showingPanelSettings = true }
             )
-            PanelHeaderButton(sfSymbol: "xmark", action: { panelManager.collapse() })
+            PanelHeaderButton(sfSymbol: "xmark.circle.fill", action: { panelManager.collapse() })
         }
         .padding(.trailing, 8)
     }
@@ -242,23 +236,40 @@ struct NotchContentView: View {
     @ViewBuilder
     private var headerRow: some View {
         HStack(spacing: 0) {
+            companionSprite
+                .offset(x: leftCompanionOffsetX, y: -2)
+                .frame(width: leftCompanionWidth)
+                .opacity(isExpanded ? 0 : 1)
+                .animation(.snappy(duration: 0.2), value: primaryTask)
+
             Color.clear
                 .frame(width: notchSize.width - cornerRadiusInsets.closed.top)
 
-            headerSprites
-                .offset(x: 15, y: -2)
-                .frame(width: sideWidth)
-                .opacity(isExpanded ? 0 : 1)
-                .animation(.none, value: isExpanded)
+            statusSprite
+                .offset(x: rightStatusOffsetX, y: -2)
+                .frame(width: rightStatusWidth)
+                .opacity(isExpanded ? 0 : (shouldShowRightStatusIcon ? 1 : 0))
+                .animation(.snappy(duration: 0.2), value: primaryTask)
         }
     }
 
     @ViewBuilder
-    private var headerSprites: some View {
+    private var companionSprite: some View {
         let topSession = sessionStore.sortedSessions.first
         SessionSpriteView(
             state: topSession?.state ?? .idle,
-            isSelected: true
+            isSelected: true,
+            role: .companion
+        )
+    }
+
+    @ViewBuilder
+    private var statusSprite: some View {
+        let topSession = sessionStore.sortedSessions.first
+        SessionSpriteView(
+            state: topSession?.state ?? .idle,
+            isSelected: true,
+            role: .status
         )
     }
 

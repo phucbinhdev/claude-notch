@@ -178,16 +178,11 @@ private struct GrassSpriteView: View {
     }
 
     private static let sobTrembleAmplitude: CGFloat = 0.3
+    private static let symbolScale: CGFloat = 0.58
 
     var body: some View {
         TimelineView(.animation(minimumInterval: 1.0 / 30, paused: !isAnimatingMotion)) { timeline in
-            SpriteSheetView(
-                spriteSheet: state.spriteSheetName,
-                frameCount: state.frameCount,
-                columns: state.columns,
-                fps: state.animationFPS,
-                isAnimating: true
-            )
+            SymbolMascotView(state: state, size: SpriteLayout.size * Self.symbolScale)
             .frame(width: SpriteLayout.size, height: SpriteLayout.size)
             .background(alignment: .bottom) {
                 if glowOpacity > 0 {
@@ -201,7 +196,7 @@ private struct GrassSpriteView: View {
             .rotationEffect(.degrees(swayDegrees(at: timeline.date)), anchor: .bottom)
             .offset(
                 x: SpriteLayout.xOffset(xPosition: xPosition, totalWidth: totalWidth) + trembleOffset(at: timeline.date, amplitude: state.emotion == .sob ? Self.sobTrembleAmplitude : 0),
-                y: yOffset + bobOffset(at: timeline.date, duration: bobDuration, amplitude: bobAmplitude)
+                y: yOffset
             )
         }
     }

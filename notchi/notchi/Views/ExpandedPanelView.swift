@@ -90,14 +90,9 @@ struct ExpandedPanelView: View {
     @ViewBuilder
     private func sessionPickerContent(geometry: GeometryProxy) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            if isActivityCollapsed {
-                Spacer()
-                    .allowsHitTesting(false)
-            } else {
-                Spacer()
-                    .frame(height: geometry.size.height * 0.3)
-                    .allowsHitTesting(false)
-            }
+            Spacer()
+                .frame(height: 8)
+                .allowsHitTesting(false)
 
             VStack(alignment: .leading, spacing: 0) {
                 if !isActivityCollapsed {
@@ -138,14 +133,9 @@ struct ExpandedPanelView: View {
     @ViewBuilder
     private func activityContent(geometry: GeometryProxy) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            if isActivityCollapsed {
-                Spacer()
-                    .allowsHitTesting(false)
-            } else {
-                Spacer()
-                    .frame(height: geometry.size.height * 0.3)
-                    .allowsHitTesting(false)
-            }
+            Spacer()
+                .frame(height: 8)
+                .allowsHitTesting(false)
 
             VStack(alignment: .leading, spacing: 0) {
                 if hasActivity {
@@ -288,6 +278,8 @@ struct PanelHeaderButton: View {
             Image(systemName: sfSymbol)
                 .font(.system(size: 16, weight: .medium))
                 .foregroundColor(.white.opacity(0.7))
+                .contentTransition(.symbolEffect(.replace))
+                .animation(.snappy(duration: 0.1), value: sfSymbol)
                 .frame(width: 32, height: 32)
                 .background(isHovered ? TerminalColors.hoverBackground : TerminalColors.subtleBackground)
                 .clipShape(Circle())
