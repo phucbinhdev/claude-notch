@@ -23,6 +23,7 @@ struct NotchContentView: View {
     @State private var showingSessionActivity = false
     @State private var isMuted = AppSettings.isMuted
     @State private var isActivityCollapsed = false
+    @State private var debugTask: NotchiTask? = nil
 
     private var sessionStore: SessionStore {
         stateMachine.sessionStore
@@ -53,7 +54,7 @@ struct NotchContentView: View {
         max(0, notchSize.height - 4)
     }
 
-    private let collapsedIconSlotWidth: CGFloat = 20
+    private let collapsedIconSlotWidth: CGFloat = 28
 
     private var leftCompanionWidth: CGFloat {
         guard !isExpanded else { return sideWidth }
@@ -63,10 +64,6 @@ struct NotchContentView: View {
     private var rightStatusWidth: CGFloat {
         guard !isExpanded else { return sideWidth }
         return collapsedIconSlotWidth
-    }
-
-    private var shouldShowRightStatusIcon: Bool {
-        !isNormalState
     }
 
     private var leftCompanionOffsetX: CGFloat {
@@ -123,6 +120,8 @@ struct NotchContentView: View {
             color: isExpanded ? .black.opacity(0.7) : .clear,
             radius: 6
         )
+        .opacity(hasSessions || isExpanded ? 1 : 0)
+        .animation(.easeInOut(duration: 0.25), value: hasSessions)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .animation(panelAnimation, value: isExpanded)
         .onReceive(NotificationCenter.default.publisher(for: .notchiShouldCollapse)) { _ in
@@ -179,10 +178,6 @@ struct NotchContentView: View {
                     } else {
                         HStack(spacing: 8) {
                             PanelHeaderButton(
-                                sfSymbol: panelManager.isPinned ? "pin.circle.fill" : "pin.circle",
-                                action: { panelManager.togglePin() }
-                            )
-                            PanelHeaderButton(
                                 sfSymbol: isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill",
                                 action: toggleMute
                             )
@@ -206,7 +201,6 @@ struct NotchContentView: View {
                 showsIndicator: updateManager.hasPendingUpdate,
                 action: { showingPanelSettings = true }
             )
-            PanelHeaderButton(sfSymbol: "xmark.circle.fill", action: { panelManager.collapse() })
         }
         .padding(.trailing, 8)
     }
@@ -233,44 +227,48 @@ struct NotchContentView: View {
         }
     }
 
+    private var hasSessions: Bool {
+        sessionStore.activeSessionCount > 0
+    }
+
     @ViewBuilder
     private var headerRow: some View {
         HStack(spacing: 0) {
             companionSprite
-                .offset(x: leftCompanionOffsetX, y: -2)
-                .frame(width: leftCompanionWidth)
-                .opacity(isExpanded ? 0 : 1)
-                .animation(.snappy(duration: 0.2), value: primaryTask)
+                .offset(x: leftCompanionOffsetX)
+                .frame(width: leftCompanionWidth, height: collapsedNotchHeight)
+                .animation(.none)
+                .opacity(isExpanded ? 0 : (hasSessions ? 1 : 0))
+                .animation(.snappy(duration: 0.2), value: hasSessions)
 
             Color.clear
                 .frame(width: notchSize.width - cornerRadiusInsets.closed.top)
 
-            statusSprite
-                .offset(x: rightStatusOffsetX, y: -2)
+            sessionCountBadge
+                .offset(x: rightStatusOffsetX, y: 0)
                 .frame(width: rightStatusWidth)
-                .opacity(isExpanded ? 0 : (shouldShowRightStatusIcon ? 1 : 0))
-                .animation(.snappy(duration: 0.2), value: primaryTask)
+                .opacity(isExpanded ? 0 : (hasSessions ? 1 : 0))
+                .animation(.snappy(duration: 0.2), value: hasSessions)
+        }
+    }
+
+    @ViewBuilder
+    private var sessionCountBadge: some View {
+        let count = sessionStore.activeSessionCount
+        ZStack {
+            Circle()
+                .fill(Color.white.opacity(0.15))
+                .frame(width: 16, height: 16)
+            Text("\(count)")
+                .font(.system(size: 9, weight: .bold, design: .rounded))
+                .foregroundColor(.white.opacity(0.85))
         }
     }
 
     @ViewBuilder
     private var companionSprite: some View {
         let topSession = sessionStore.sortedSessions.first
-        SessionSpriteView(
-            state: topSession?.state ?? .idle,
-            isSelected: true,
-            role: .companion
-        )
-    }
-
-    @ViewBuilder
-    private var statusSprite: some View {
-        let topSession = sessionStore.sortedSessions.first
-        SessionSpriteView(
-            state: topSession?.state ?? .idle,
-            isSelected: true,
-            role: .status
-        )
+        CollapsedMascotView(task: debugTask ?? topSession?.state.task ?? .idle)
     }
 
     private func toggleMute() {

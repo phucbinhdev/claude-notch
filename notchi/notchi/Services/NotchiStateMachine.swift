@@ -71,9 +71,13 @@ final class NotchiStateMachine {
             handleClaudeUsageResumeTrigger(.sessionStart)
 
         case "Stop", "SubagentStop":
+            SoundService.shared.clearCooldown(for: event.sessionId)
             SoundService.shared.playNotificationSound(sessionId: event.sessionId, isInteractive: session.isInteractive)
             stopFileWatcher(sessionId: event.sessionId)
             scheduleFileSync(sessionId: event.sessionId, cwd: event.cwd)
+            if session.isInteractive {
+                NotchPanelManager.shared.expand()
+            }
 
         case "SessionEnd":
             stopFileWatcher(sessionId: event.sessionId)
